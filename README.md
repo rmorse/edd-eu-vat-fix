@@ -1,15 +1,16 @@
 # edd-eu-vat-fix
 
-This is small plugin that helps to correct issues with incorrect VAT rates when using EDD + EDD EU VAT plugin with the EDD Stripe Plugin.
+This is small plugin that helps to correct issues with incorrect VAT rates when using EDD + EDD EU VAT (from Barn2) plugin with the EDD Stripe Plugin.
 
 The issue:
 
  - It looks like the issue only occurs for users that have an indvidual subscription plan to the Stripe Payment Gateway.
  - EDD no longer offer individual subscription plans
- - At some point, The EDD Stripe gateway stops updating for some users
- - This caused issues with the EDD EU VAT plugin which had a kind of caching affect
- - Users that live outside of the EU would sometimes get charged VAT
- - Users that should have been charged VAT would not be charged VAT
+ - At some point, The EDD Stripe gateway stops updating for some users, it seems those on the indvidual plans
+ - This caused issues with the EDD EU VAT plugin which had a kind of caching effect:
+   - Users that live outside of the EU would sometimes get charged VAT
+   - Users that should have been charged VAT would not be charged VAT
+   - This seems to be based on whether the previous purchase should have had VAT or not.
 
 How this plugin addresses this:
 
