@@ -24,4 +24,4 @@ How this plugin addresses this:
 	   
 **Note:** - this does not account for discounts and charges that may have been applied to the order.
 
-**Note 2:** - this plugin has not been extensively tested - take a backup and delete once you have finished using.
+**Note 2:** - this plugin has not been extensively tested - use at your own risk - take a backup and delete once you have finished using.
