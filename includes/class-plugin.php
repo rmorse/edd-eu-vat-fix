@@ -219,6 +219,7 @@ class EDD_EU_VAT_Fix {
 		$payment->tax = 0;
 		$payment->subtotal = $payment->total;
 		$payment->update_meta( '_edd_eu_vat_fix_status', 'removed' );
+		$payment->delete_meta( 'tax_rate' );
 		$payment->save();
 		
 		// Redirect back to referrer.
