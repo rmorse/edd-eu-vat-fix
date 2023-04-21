@@ -19,42 +19,6 @@ class EDD_EU_VAT_Fix {
 		add_action( 'wp_ajax_edd_eu_vat_fix_remove_vat', array( $this, 'remove_vat' ) );
 	}
 
-	public function remove_vat() {
-		// Get action and verify nonce.
-		$action = isset( $_GET['action'] ) ? sanitize_text_field( $_GET['action'] ) : '';
-		if ( ! wp_verify_nonce( $_GET['nonce'], $action ) ) {
-			wp_send_json_error( array( 'message' => __( 'Invalid nonce', 'edd-eu-vat-fix' ) ) );
-			return;
-		}
-
-		// Get order ID.
-		$order_id = isset( $_GET['payment_id'] ) ? absint( $_GET['payment_id'] ) : 0;
-		$referrer = isset( $_GET['referrer'] ) ? esc_url_raw( $_GET['referrer'] ) : '';
-		$payment = new EDD_Payment( $order_id );
-		$tax = $payment->tax;
-		$total = $payment->total;
-
-		// Remove the tax from order.
-		$payment->total = (float)$total - (float)$payment->tax;
-		$payment->tax = 0;
-		$payment->subtotal = $payment->total;
-		$payment->update_meta('_edd_eu_vat_fix_status', 'removed');
-		$payment->save();
-		
-		// Redirect back to referrer.
-		wp_redirect( $referrer );
-		exit;
-	}
-	public function add_vat() {
-		// Get action and verify nonce.
-		$action = isset( $_GET['action'] ) ? sanitize_text_field( $_GET['action'] ) : '';
-		if ( ! wp_verify_nonce( $_GET['nonce'], $action ) ) {
-			wp_send_json_error( array( 'message' => __( 'Invalid nonce', 'edd-eu-vat-fix' ) ) );
-			return;
-		}
-		
-
-	}
 	public function add_location_filter() {
 
 		// A a location filter to the orders page to show if the orders are EU or non-EU.
@@ -143,20 +107,39 @@ class EDD_EU_VAT_Fix {
 		
 		// TODO: We don't take into consideration fees or discounts.
 
-		if ( $is_eu && ! $is_reverse_charged && $tax === (float)0 ) {
+		if ( ( $is_eu && ! $is_reverse_charged && $tax === (float)0 )  || $fix_status === 'added' ) {
 			// We have an EU payment missing VAT
+			$add_url_args = array(
+				'action' => 'edd_eu_vat_fix_add_vat',
+				'payment_id' => absint( $order_id ),
+				'nonce' => wp_create_nonce( 'edd_eu_vat_fix_add_vat' ),
+				// Add current page to redirect back to.
+				'referrer' => urlencode_deep( admin_url( 'edit.php?post_type=download&page=edd-payment-history&view=view-order-details&id=' . $order_id ) ),
+			);
+			$add_vat_url = add_query_arg( $add_url_args, admin_url( 'admin-ajax.php' ) );
+
 			ob_start();
 			?>
 				<?php
 					esc_html_e( 'This EU/UK order is missing VAT.', 'edd-eu-vat-fix' );
 				?>
-				<button class="button button-primary" id="edd_eu_vat_fix_add_vat"><?php esc_html_e( 'Adjust and add VAT', 'edd-eu-vat-fix' ); ?></button>
+				<?php
+					// if ( $fix_status === '' ) {
+				?>
+					<p><a href="<?php echo esc_url( $add_vat_url ); ?>" class="button button-primary" id="edd_eu_vat_fix_remove_vat"><?php esc_html_e( 'Adjust and add VAT', 'edd-eu-vat-fix' ); ?></a></p>
+				<p><?php
+					//}
+					esc_html_e( 'The order sub total will be reduced by the local VAT percentage and a line item will be added to show the VAT. ', 'edd-eu-vat-fix' );
+				?></p>
+				<p><?php
+					esc_html_e( 'The total will remain the same. ', 'edd-eu-vat-fix' );
+				?></p>
 			<?php
 			$message = ob_get_clean();
 			$this->render_metabox_message( $message );
 
 		} else if ( ( ! $is_eu && $tax > 0 ) || $fix_status === 'removed' ) {
-			// We have a non-EU payment with VAT
+			// We have a non-EU payment with VAT.
 			$remove_url_args = array(
 				'action' => 'edd_eu_vat_fix_remove_vat',
 				'payment_id' => absint( $order_id ),
@@ -176,6 +159,7 @@ class EDD_EU_VAT_Fix {
 				?>
 			</p>
 			<ol>
+				<li><?php echo wp_kses_post( sprintf( __( 'Initialiase a partial refund of<br />%s<br />via your payment provider.', 'edd-eu-vat-fix' ), '<strong>' . $eu_vat_amount . '</strong>') ); ?></li>
 				<li><?php esc_html_e( 'Click the button to remove VAT from the order (the total will be updated)', 'edd-eu-vat-fix' ) ?><br />
 				<?php
 					if ( $fix_status === '' ) {
@@ -185,7 +169,6 @@ class EDD_EU_VAT_Fix {
 					}
 				?>
 				</li>
-				<li><?php echo wp_kses_post( sprintf( __( 'Initialiase a partial refund of<br />%s<br />via your payment provider.', 'edd-eu-vat-fix' ), '<strong>' . $eu_vat_amount . '</strong>') ); ?></li>
 				<li><?php esc_html_e( 'Contact customer to let them know their order has been updated', 'edd-eu-vat-fix' ) ?></li>
 			</ol>
 			<?php
@@ -213,5 +196,76 @@ class EDD_EU_VAT_Fix {
 			</div>
 		</div>
 		<?php
+	}
+
+	
+	public function remove_vat() {
+		// Get action and verify nonce.
+		$action = isset( $_GET['action'] ) ? sanitize_text_field( $_GET['action'] ) : '';
+		if ( ! wp_verify_nonce( $_GET['nonce'], $action ) ) {
+			wp_send_json_error( array( 'message' => __( 'Invalid nonce', 'edd-eu-vat-fix' ) ) );
+			return;
+		}
+
+		// Get order ID.
+		$order_id = isset( $_GET['payment_id'] ) ? absint( $_GET['payment_id'] ) : 0;
+		$referrer = isset( $_GET['referrer'] ) ? esc_url_raw( $_GET['referrer'] ) : '';
+		$payment = new EDD_Payment( $order_id );
+		$tax = $payment->tax;
+		$total = $payment->total;
+
+		// Remove the tax from order.
+		$payment->total = (float)$total - (float)$payment->tax;
+		$payment->tax = 0;
+		$payment->subtotal = $payment->total;
+		$payment->update_meta( '_edd_eu_vat_fix_status', 'removed' );
+		$payment->save();
+		
+		// Redirect back to referrer.
+		wp_redirect( $referrer );
+		exit;
+	}
+	public function add_vat() {
+		// Get action and verify nonce.
+		$action = isset( $_GET['action'] ) ? sanitize_text_field( $_GET['action'] ) : '';
+		if ( ! wp_verify_nonce( $_GET['nonce'], $action ) ) {
+			wp_send_json_error( array( 'message' => __( 'Invalid nonce', 'edd-eu-vat-fix' ) ) );
+			return;
+		}
+
+		// Get order ID.
+		$order_id = isset( $_GET['payment_id'] ) ? absint( $_GET['payment_id'] ) : 0;
+		$referrer = isset( $_GET['referrer'] ) ? esc_url_raw( $_GET['referrer'] ) : '';
+		$payment = new EDD_Payment( $order_id );
+
+		$total = $payment->total;
+
+		// Get tax rate.
+		// get order country:
+		$eu_countries = Barn2\Plugin\EDD_VAT\Util::get_eu_countries();
+		$base_country = edd_get_option( 'edd_vat_address_country', edd_get_shop_country() );
+		$eu_countries = array_diff( $eu_countries, [ $base_country ] );
+
+		$country = $payment->address['country'];
+		$vat_rates = Barn2\Plugin\EDD_VAT\Util::get_eu_vat_rates();
+
+		if ( in_array( $payment->address['country'], $eu_countries, true ) ) {
+			
+			// Then get the tax rate for that country.
+			$vat_rate_percentage = $vat_rates[ $payment->address['country'] ];
+			// Now adjust the sub total by subtracting the tax (at the tax rate) from the total.
+			$tax = ( $total / 100 ) * (float)$vat_rate_percentage;
+			$payment->subtotal = (float)$total - (float)$tax;
+			$payment->tax = $tax;
+		
+			// Remove the tax from order.
+			$payment->update_meta( '_edd_eu_vat_fix_status', 'added' );
+			$payment->update_meta( 'tax_rate', $vat_rate_percentage );
+			$payment->save(); 
+		}
+		
+		// Redirect back to referrer.
+		wp_redirect( $referrer );
+		exit;
 	}
 }
