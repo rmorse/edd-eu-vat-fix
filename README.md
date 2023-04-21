@@ -19,8 +19,9 @@ How this plugin addresses this:
     - Orders that shouldn't have VAT but do, have a button to automatically update the order and remove all the VAT info.
 	   - It is recommended to issue a partial refund via the payment processor directly for the VAT amount.
 	- Orders that should have VAT but dont - there is a button to add VAT.  
-	   - This will be calculated based on the VAT rate for the country of the customer.
-	   - The total will remain the same (meaning you lose the VAT amount)
-
+	   - This will be calculated based on the VAT rate for the country of the order.
+	   - The total will remain the same
+	   
 **Note:** - this does not account for discounts and charges that may have been applied to the order.
+
 **Note 2:** - this plugin has not been extensively tested - take a backup and delete once you have finished using.
